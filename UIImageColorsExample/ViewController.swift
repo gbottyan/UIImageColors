@@ -7,7 +7,7 @@
 //
 
 import UIKit
-import UIImageColors
+//import UIImageColors
 import SDWebImage
 struct Image : Codable {
     var url: String
