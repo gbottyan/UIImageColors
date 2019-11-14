@@ -112,7 +112,7 @@ class ViewController: UIViewController, UICollectionViewDelegate, UICollectionVi
     private let playButton: UIButton = {
         let b = UIButton()
         b.translatesAutoresizingMaskIntoConstraints = false
-        b.setImage(#imageLiteral(resourceName: "play").withRenderingMode(.alwaysTemplate), for: .normal)
+        b.setImage(UIImage(named: "play")?.withRenderingMode(.alwaysTemplate), for: .normal)
         b.tintColor = .white
         return b
     }()
