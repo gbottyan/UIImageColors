@@ -7,7 +7,7 @@
 //
 
 import UIKit
-
+import SDWebImage
 class AlbumViewCell: UICollectionViewCell {
     
     let imageView: UIImageView = {
@@ -35,6 +35,12 @@ class AlbumViewCell: UICollectionViewCell {
     
     required init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    func loadImage(image: Image?) {
+        if let image = image , let url = URL(string: image.url) {
+            self.imageView.sd_setImage(with: url, completed: nil)
+        }
     }
     
 }

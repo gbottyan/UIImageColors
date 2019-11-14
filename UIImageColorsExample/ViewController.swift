@@ -8,23 +8,50 @@
 
 import UIKit
 import UIImageColors
+import SDWebImage
+struct Image : Codable {
+    var url: String
+    var type: String
+}
+
+struct Entry : Codable {
+    var title: String
+    var images: [Image]
+    func image(type:String) -> Image? {
+        for i in images {
+            if i.type == type {
+                return i
+            }
+        }
+        return nil
+    }
+}
+
+struct Response : Codable {
+    var totalCount: Int
+    var pageSize: Int
+    var pageNumber: Int
+    var entries: [Entry]
+}
 
 class ViewController: UIViewController, UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
     
-    let albums: [Album] = [
-        Album(albumImage: #imageLiteral(resourceName: "Calvin Klein - Kaws"), albumName: "Calvin Klein", artistName: "Kaws", year: 1999),
-        Album(albumImage: #imageLiteral(resourceName: "Cafe Terrace at Night - Vincent Van Gogh"), albumName: "Cafe Terrace at Night", artistName: "Vincent Van Gogh", year: 1888),
-        Album(albumImage: #imageLiteral(resourceName: "Woman I - Willem de Kooning"), albumName: "Woman I", artistName: "Willem de Kooning", year: 1952),
-        Album(albumImage: #imageLiteral(resourceName: "Skull - Jean-Michel Basquiat"), albumName: "Skull", artistName: "Jean-Michel Basquiat", year: 1981),
-        Album(albumImage: #imageLiteral(resourceName: "Les Demoiselles d'Avignon - Picasso"), albumName: "Les Demoiselles d'Avignon", artistName: "Pablo Picasso", year: 1907),
-        Album(albumImage: #imageLiteral(resourceName: "Le Reve - Pablo Picasso"), albumName: "Le Rêve", artistName: "Pablo Picasso", year: 1932),
-        Album(albumImage: #imageLiteral(resourceName: "Mona Lisa - Leonardo da Vinci"), albumName: "Mona Lisa", artistName: "Leonardo da Vinci", year: 1503),
-        Album(albumImage: #imageLiteral(resourceName: "No. 210:No. 211 - Mark Rothko"), albumName: "No. 210/211 Orange", artistName: "Mark Rothko", year: 1960),
-        Album(albumImage: #imageLiteral(resourceName: "Blue Nude II - Henri Matisse"), albumName: "Blue Nude II", artistName: "Henri Matisse", year: 1952),
-        Album(albumImage: #imageLiteral(resourceName: "Nighthawks - Edward Hopper"), albumName: "Nighthawks", artistName: "Edward Hopper", year: 1942),
-        Album(albumImage: #imageLiteral(resourceName: "Number 1A - Jackson Pollock"), albumName: "Number 1A", artistName: "Jackson Pollock", year: 1948),
-        Album(albumImage: #imageLiteral(resourceName: "Self-portrait Spring 1887 - Vincent Van Gogh"), albumName: "Self-Portrait", artistName: "Vincent Van Gogh", year: 1887),
-    ]
+    var database: [Entry]  = []
+
+    func load(completion: ()->Void ) {
+        do  {
+            if let url = URL(string: "https://vdk-ovp.ocs.demo.accedo.tv/category/tvshows-drama/tvshow?pageNumber=1&pageSize=5") {
+                let data = try Data(contentsOf: url)
+                let jsonDecoder = JSONDecoder()
+                let response =   try jsonDecoder.decode(Response.self, from: data)
+                //print("response: \(response)")
+                database.append(contentsOf: response.entries)
+                completion()
+            }
+        } catch let e {
+            print("error: \(e)")
+        }
+    }
     
     private let cellID = "cellID"
     private let cellSizeFactor: CGFloat = 0.8
@@ -135,7 +162,11 @@ class ViewController: UIViewController, UICollectionViewDelegate, UICollectionVi
         
         // Update view
         self.selectedIndex = IndexPath(item: 0, section: 0)
-        self.updateView(with: self.albums[0])
+
+        self.load {
+            self.updateView(with: self.database[0])
+        }
+
     }
     
     @objc func setupPlayTimer() {
@@ -147,7 +178,7 @@ class ViewController: UIViewController, UICollectionViewDelegate, UICollectionVi
     
     @objc func startPlaying() {
         if let index = self.selectedIndex {
-            self.selectedIndex = IndexPath(item: (index.item+1)%self.albums.count, section: 0)
+            self.selectedIndex = IndexPath(item: (index.item+1)%self.database.count, section: 0)
             self.goTo(indexPath: self.selectedIndex)
         }
     }
@@ -155,7 +186,7 @@ class ViewController: UIViewController, UICollectionViewDelegate, UICollectionVi
     func goTo(indexPath: IndexPath?) {
         if let index = indexPath {
             self.collectionView.scrollToItem(at: index, at: .centeredHorizontally, animated: true)
-            self.updateView(with: self.albums[index.item])
+            self.updateView(with: self.database[index.item])
         }
     }
 
@@ -166,12 +197,12 @@ class ViewController: UIViewController, UICollectionViewDelegate, UICollectionVi
     }
     
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return self.albums.count
+        return self.database.count
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: self.cellID, for: indexPath) as! AlbumViewCell
-        cell.imageView.image = self.albums[indexPath.item].albumImage
+        cell.loadImage(image:self.database[indexPath.item].image(type: "thumbnail"))
         return cell
     }
     
@@ -210,25 +241,49 @@ class ViewController: UIViewController, UICollectionViewDelegate, UICollectionVi
         }
     }
     
-    private func updateView(with album: Album) {
-        album.albumImage?.getColors(quality: .high) { colors in
-            guard let colors = colors else { return }
+    private func updateView(with album: Entry) {
+        let manager = SDWebImageManager.shared
+        if let image = album.image(type: "thumbnail"), let url = URL(string: image.url) {
+            manager.loadImage(with: url, options: [], progress: nil) { (image, data, err, cacheType, bool, url) in
+                if let image = image {
+            image.getColors(quality: .high) { colors in
+                guard let colors = colors else { return }
 
-            UIView.animate(withDuration: 0.15, animations: {
-                self.view.backgroundColor = colors.background
-                
-                self.mainLabel.text = album.albumName
-                self.mainLabel.textColor = colors.primary
-                
-                self.secondaryLabel.text = album.artistName
-                self.secondaryLabel.textColor = colors.secondary
-                
-                self.detailLabel.text = "\(album.year)"
-                self.detailLabel.textColor = colors.detail
-                
-                self.playButton.tintColor = colors.detail
-            })
+                UIView.animate(withDuration: 0.15, animations: {
+                    self.view.backgroundColor = colors.background
+
+                    self.mainLabel.text = album.title
+                    self.mainLabel.textColor = colors.primary
+
+                    //self.secondaryLabel.text = album.artistName
+                    //self.secondaryLabel.textColor = colors.secondary
+
+                    //self.detailLabel.text = "\(album.year)"
+                    //self.detailLabel.textColor = colors.detail
+
+                    //self.playButton.tintColor = colors.detail
+                })
+            }
+                }
         }
+        }
+        /*
+        SDWebImageManager *manager = [SDWebImageManager sharedManager];
+        [manager downloadWithURL:imageURL
+            options:0
+            progress:^(NSInteger receivedSize, NSInteger expectedSize)
+            {
+            // progression tracking code
+            }
+            completed:^(UIImage *image, NSError *error, SDImageCacheType cacheType, BOOL finished)
+            {
+            if (image)
+            {
+            // do something with image
+            }
+            }];
+        album.image(type: "thumbnail")?
+        */
     }
 }
 
